@@ -68,9 +68,25 @@ typedef struct {
     int32_t flight_base_y;
     int16_t flight_amplitude;
     bool outcome_is_face;
+    uint8_t language; /* 0=fr 1=en 2=es 3=it 4=de 5=zh-CN */
 } pile_ou_face_t;
 
 static pile_ou_face_t pf;
+
+static uint8_t pile_ou_face_detect_language(const char *locale)
+{
+    if (locale[0] == 'e' && locale[1] == 'n') return 1U;
+    if (locale[0] == 'e' && locale[1] == 's') return 2U;
+    if (locale[0] == 'i' && locale[1] == 't') return 3U;
+    if (locale[0] == 'd' && locale[1] == 'e') return 4U;
+    if (locale[0] == 'z' && locale[1] == 'h') return 5U;
+    return 0U;
+}
+
+#define L(fr_str, en_str, es_str, it_str, de_str, zh_str) \
+    (pf.language == 1U ? (en_str) : pf.language == 2U ? (es_str) : \
+     pf.language == 3U ? (it_str) : pf.language == 4U ? (de_str) : \
+     pf.language == 5U ? (zh_str) : (fr_str))
 
 #define number gm_plugin_lvgl_style_number
 #define color gm_plugin_lvgl_style_color
@@ -449,8 +465,8 @@ static void position_coin(int32_t center_x, int32_t center_y)
 
 static void show_idle(void)
 {
-    pf.ui->label_set_text(pf.title_label, "Pile ou Face");
-    pf.ui->label_set_text(pf.hint_label, "Coup de tete vers le haut pour lancer");
+    pf.ui->label_set_text(pf.title_label, L("Pile ou Face", "Heads or Tails", "Cara o cruz", "Testa o croce", "Kopf oder Zahl", "正面或反面"));
+    pf.ui->label_set_text(pf.hint_label, L("Coup de tete vers le haut pour lancer", "Tilt your head up to toss", "Inclina la cabeza hacia arriba para lanzar", "Inclina la testa in alto per lanciare", "Kopf nach oben neigen zum Werfen", "抬头向上即可投掷"));
     pf.ui->image_set_source(pf.coin_image, &s_coin_face_desc);
     position_coin(pf.flight_start_x, pf.flight_base_y);
 }
@@ -463,7 +479,7 @@ static void show_spin_tick(void)
     case 2U: frame = &s_coin_pile_desc; break;
     default: frame = &s_coin_edge_desc; break;
     }
-    pf.ui->label_set_text(pf.title_label, "Ca tourne...");
+    pf.ui->label_set_text(pf.title_label, L("Ca tourne...", "Spinning...", "Girando...", "Gira...", "Dreht...", "翻转中..."));
     pf.ui->label_set_text(pf.hint_label, "");
     pf.ui->image_set_source(pf.coin_image, frame);
 }
@@ -471,7 +487,9 @@ static void show_spin_tick(void)
 static void show_result(void)
 {
     pf.ui->label_set_text(pf.title_label,
-                           pf.outcome_is_face ? "FACE !" : "PILE !");
+                           pf.outcome_is_face
+                               ? L("FACE !", "HEADS!", "¡CARA!", "TESTA!", "KOPF!", "正面！")
+                               : L("PILE !", "TAILS!", "¡CRUZ!", "CROCE!", "ZAHL!", "反面！"));
     pf.ui->label_set_text(pf.hint_label, "");
     pf.ui->image_set_source(pf.coin_image,
                              pf.outcome_is_face ? &s_coin_face_desc : &s_coin_pile_desc);
@@ -534,7 +552,13 @@ static gm_plugin_result_t pile_ou_face_start(void *context)
     uint32_t coin_size, edge_width, tree_big_h, tree_big_w, tree_small_h,
         tree_small_w;
     int32_t ground_y;
+    char locale[GM_PLUGIN_LOCALE_TAG_MAX];
     (void)context;
+
+    pf.language = 0U;
+    if (pf.host->locale_get != 0 &&
+        pf.host->locale_get(locale) == GM_PLUGIN_OK)
+        pf.language = pile_ou_face_detect_language(locale);
 
     if (pf.host->display_get_info(&display) != GM_PLUGIN_OK ||
         display.width < 140U || display.height < 140U)
@@ -595,7 +619,7 @@ static gm_plugin_result_t pile_ou_face_start(void *context)
     if (create_trees(pf.screen, (int32_t)display.width, ground_y) != GM_PLUGIN_OK)
         goto no_memory;
 
-    pf.title_label = make_label(pf.screen, "Pile ou Face", 0x90);
+    pf.title_label = make_label(pf.screen, L("Pile ou Face", "Heads or Tails", "Cara o cruz", "Testa o croce", "Kopf oder Zahl", "正面或反面"), 0x90);
     pf.coin_image = pf.ui->image_create(pf.screen, &s_coin_face_desc);
     pf.hint_label = make_label(pf.screen, "", 0x70);
     if (pf.title_label == 0 || pf.coin_image == 0 || pf.hint_label == 0)
